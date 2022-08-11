@@ -22,6 +22,7 @@ env:
   SECP256K1_TEST_ITERS:
   BENCH: yes
   SECP256K1_BENCH_ITERS: 2
+  JNI: no
   CTIMETEST: yes
   # Compile and run the tests
   EXAMPLES: yes
@@ -78,6 +79,7 @@ task:
     - env: {CFLAGS: -O0, CTIMETEST: no}
     - env: { ECMULTGENPRECISION: 2, ECMULTWINDOW: 2 }
     - env: { ECMULTGENPRECISION: 8, ECMULTWINDOW: 4 }
+    - env: {BUILD: check-java, JNI: yes, ECDH: yes, EXPERIMENTAL: yes, SCHNORRSIG: yes, ECDSAADAPTOR: yes}
   matrix:
     - env:
         CC: gcc

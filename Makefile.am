@@ -7,6 +7,14 @@ ACLOCAL_AMFLAGS = -I build-aux/m4
 AM_CFLAGS = $(SECP_CFLAGS)
 
 lib_LTLIBRARIES = libsecp256k1.la
+if USE_JNI
+JNI_LIB = libsecp256k1_jni.la
+noinst_LTLIBRARIES = $(JNI_LIB)
+else
+JNI_LIB =
+noinst_LTLIBRARIES =
+endif
+
 include_HEADERS = include/secp256k1.h
 include_HEADERS += include/secp256k1_preallocated.h
 noinst_HEADERS =
@@ -47,6 +55,8 @@ noinst_HEADERS += src/modinv64_impl.h
 noinst_HEADERS += src/precomputed_ecmult.h
 noinst_HEADERS += src/precomputed_ecmult_gen.h
 noinst_HEADERS += src/assumptions.h
+noinst_HEADERS += src/java/org_bitcoin_NativeSecp256k1.h
+noinst_HEADERS += src/java/org_bitcoin_Secp256k1Context.h
 noinst_HEADERS += src/util.h
 noinst_HEADERS += src/scratch.h
 noinst_HEADERS += src/scratch_impl.h
@@ -65,7 +75,7 @@ noinst_HEADERS += contrib/lax_der_privatekey_parsing.c
 noinst_HEADERS += examples/random.h
 
 PRECOMPUTED_LIB = libsecp256k1_precomputed.la
-noinst_LTLIBRARIES = $(PRECOMPUTED_LIB)
+noinst_LTLIBRARIES += $(PRECOMPUTED_LIB)
 libsecp256k1_precomputed_la_SOURCES =  src/precomputed_ecmult.c src/precomputed_ecmult_gen.c
 libsecp256k1_precomputed_la_CPPFLAGS = $(SECP_INCLUDES)
 
@@ -87,7 +97,9 @@ endif
 
 libsecp256k1_la_SOURCES = src/secp256k1.c
 libsecp256k1_la_CPPFLAGS = $(SECP_INCLUDES)
-libsecp256k1_la_LIBADD = $(SECP_LIBS) $(COMMON_LIB) $(PRECOMPUTED_LIB)
+libsecp256k1_la_LIBADD = $(JNI_LIB) $(SECP_LIBS) $(COMMON_LIB) $(PRECOMPUTED_LIB)
+libsecp256k1_jni_la_SOURCES  = src/java/org_bitcoin_NativeSecp256k1.c src/java/org_bitcoin_Secp256k1Context.c
+libsecp256k1_jni_la_CPPFLAGS = -DSECP256K1_BUILD $(JNI_INCLUDES)
 libsecp256k1_la_LDFLAGS = -no-undefined -version-info $(LIB_VERSION_CURRENT):$(LIB_VERSION_REVISION):$(LIB_VERSION_AGE)
 
 if VALGRIND_ENABLED
@@ -139,6 +151,29 @@ exhaustive_tests_LDFLAGS = -static
 TESTS += exhaustive_tests
 endif
 
+JAVAROOT=src/java
+JAVAORG=org/bitcoin
+JAVA_FILES= \
+   $(JAVAROOT)/$(JAVAORG)/NativeSecp256k1.java \
+   $(JAVAROOT)/$(JAVAORG)/NativeSecp256k1Util.java \
+   $(JAVAROOT)/$(JAVAORG)/NativeSecp256k1Test.java \
+   $(JAVAROOT)/$(JAVAORG)/Secp256k1Context.java
+
+if USE_JNI
+
+.stamp-java: $(JAVA_FILES)
+	@echo Compiling $^
+	$(AM_V_at) javac $^
+	@touch $@
+
+if USE_TESTS
+
+check-java: libsecp256k1.la .stamp-java
+	$(AM_V_at)java -Djava.library.path="./:./src:./src/.libs:.libs/" -cp "$(JAVAROOT)" $(JAVAORG)/NativeSecp256k1Test
+
+endif
+endif
+
 if USE_EXAMPLES
 noinst_PROGRAMS += ecdsa_example
 ecdsa_example_SOURCES = examples/ecdsa.c
@@ -175,7 +210,7 @@ endif
 
 ### Precomputed tables
 EXTRA_PROGRAMS = precompute_ecmult precompute_ecmult_gen
-CLEANFILES = $(EXTRA_PROGRAMS)
+CLEANFILES = $(EXTRA_PROGRAMS) $(JAVAROOT)/$(JAVAORG)/*.class .stamp-java
 
 precompute_ecmult_SOURCES = src/precompute_ecmult.c
 precompute_ecmult_CPPFLAGS = $(SECP_INCLUDES)
@@ -210,7 +245,7 @@ maintainer-clean-local: clean-precomp
 clean-precomp:
 	rm -f $(PRECOMP)
 
-EXTRA_DIST = autogen.sh SECURITY.md
+EXTRA_DIST = autogen.sh SECURITY.md $(JAVA_FILES)
 
 if ENABLE_MODULE_ECDH
 include src/modules/ecdh/Makefile.am.include
